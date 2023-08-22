@@ -1,0 +1,161 @@
+---
+- name: Install Docker and Kubeadm on Ubuntu
+  hosts: all
+  become: yes
+
+  tasks:
+    # Docker Installation
+    - name: remove previously installed docker if any
+      shell: for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do apt-get remove -y $pkg; done
+
+    - name: Update packages
+      apt:
+        update_cache: yes
+
+    - name: Install required dependencies
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+        state: present
+
+    - name: Add Docker's official GPG key
+      apt_key:
+        url: "https://download.docker.com/linux/ubuntu/gpg"
+        state: present
+
+    - name: Add Docker's official APT repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+
+    - name: Install Docker
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+        state: present
+        update_cache: yes
+
+    - name: Ensure Docker service is running
+      service:
+        name: docker
+        state: started
+
+    - name: Clone mirantis docker plugin git repository
+      git:
+        repo: https://github.com/Mirantis/cri-dockerd.git
+        dest: '/root/cri-dockerd'
+        clone: yes
+        update: yes
+
+    - name: Clone custom shell script
+      git:
+        repo: https://github.com/scottylorraine/cridockerdscriptansible.git
+        dest: '/root/cridockerdscriptansible'
+        clone: yes
+        update: yes
+
+    - name: delete it if present
+      shell: rm -f /root/cri-dockerd.sh
+
+    - name: delete the script if present
+      shell: rm -f /root/secondcrio.sh
+
+    - name: copy the script to the root folder
+      shell: cp /root/cridockerdscriptansible/cri-dockerd.sh /root
+
+    - name: copy the script to the root folder
+      shell: cp /root/cridockerdscriptansible/secondcrio.sh /root
+
+    - name: giving executable permissions for the script
+      shell: chmod +x /root/cri-dockerd.sh
+
+    - name: giving executable permissions for the script
+      shell: chmod +x /root/secondcrio.sh
+
+    - name: execute the script to make the cri-dockerd running
+      shell: bash /root/cri-dockerd.sh
+
+    - name: execute the script to make the second cri-dockerd running
+      shell: bash /root/secondcrio.sh
+
+
+
+    - name: Update packages
+      apt:
+        update_cache: yes
+
+
+    - name: Install or update apt-transport-https, ca-certificates, curl
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+        state: latest 
+
+    # - name: Add Kubernetes APT GPG Key
+    #   shell: sudo curl -fsSL https://dl.k8s.io/apt/doc/apt-key.gpg | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-archive-keyring.gpg
+
+
+    - name: Add Kubernetes APT GPG key
+      apt_key:
+        url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+        state: present
+
+
+    # - name: Add the Google-hosted apt repository
+    #   shell: sudo echo "deb [signed-by=/etc/apt/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+
+
+    - name: Add Kubernetes APT repository
+      apt_repository:
+        repo: deb http://apt.kubernetes.io/ kubernetes-xenial main
+        state: present
+
+
+    - name: Update packages
+      apt:
+        update_cache: yes
+
+    - name: installing the kubernetes components 
+      shell: sudo apt-get install -y kubelet kubeadm kubectl
+
+    - name: mark hold the components
+      shell: sudo apt-mark hold kubelet kubeadm kubectl
+
+    - name: turning off the swap for the machine 
+      shell: sudo swapoff -a
+    
+    - name: disable it completely 
+      shell: sudo sed -i -e '/swap/d' /etc/fstab
+
+
+    - name: spining up the kubernetes cluster 
+      shell: kubeadm init --pod-network-cidr "10.244.0.0/16" --cri-socket "unix:///var/run/cri-dockerd.sock"
+
+
+    - name: copy the script to the root folder 
+      shell: cp /root/cridockerdscriptansible/addingkubeconfig.sh /root
+
+    - name: giving executable permissions for the script
+      shell: chmod +x /root/addingkubeconfig.sh
+
+# will copy the kubeconfig file to /home dir  and also install the pod network [weave]
+    # - name: execute the script which will copt the kubeconfig file and install pod network 
+    #   shell: bash /root/cri-dockerd.sh
+
+    
+
+    - name: Apply weave network plugin in Kubernetes
+  hosts: target_host_name_or_group
+  become: yes
+  tasks:
+    - name: Apply weave-daemonset in Kubernetes from /root directory
+      command:
+        cmd: kubectl apply -f https://github.com/weaveworks/weave/releases/download/v2.8.1/weave-daemonset-k8s.yaml
+        chdir: /root
