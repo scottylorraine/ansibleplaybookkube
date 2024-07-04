@@ -2,7 +2,8 @@
 - name: Install Docker and Kubeadm on Ubuntu
   hosts: all
   become: yes
-
+  #author:ananth
+  #description:ansible playbook to deploy a kubernetes cluster  using the kUBEADM into a remote host machine 
   tasks:
     # Docker Installation
     - name: remove previously installed docker if any
