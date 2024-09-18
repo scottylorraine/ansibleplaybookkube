@@ -3,7 +3,7 @@
   hosts: all
   become: yes
   #author:ananth
-  #description:ansible playbook to deploy a kubernetes cluster  using the kUBEADM into a remote host machine 
+  #description:ansible playbook to deploy a kubernetes cluster  using the kUBEADM into a remote host machine OS=ubuntu
   tasks:
     # Docker Installation
     - name: remove previously installed docker if any
